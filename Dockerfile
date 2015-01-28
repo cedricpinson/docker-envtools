@@ -4,6 +4,7 @@ MAINTAINER trigrou
 
 
 RUN apt-get -y update --fix-missing && apt-get install -y \
+    p7zip-full \
     ccache \
     cmake \
     g++ \

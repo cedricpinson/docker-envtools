@@ -6,6 +6,8 @@ import os
 import time
 import math
 import json
+import glob
+import argparse
 
 DEBUG=False
 
@@ -17,8 +19,7 @@ panorama_packer_cmd="panoramaPacker"
 envremap_cmd="envremap"
 seamlessCubemap_cmd="seamlessCubemap"
 envBackground_cmd="envBackground"
-#gzip_cmd="gzip"
-#7zip_cmd="7z"
+compress_7Zip_cmd="7z"
 
 def execute_command(cmd, **kwargs):
 
@@ -59,6 +60,7 @@ class ProcessEnvironment(object):
         self.pattern_filter = kwargs.get("pattern_filter", "rgss" )
         self.nb_samples = kwargs.get("nb_samples", "1024" )
         self.prefilter_stop_size = kwargs.get("prefilter_stop_size", 8 )
+        self.fixedge = kwargs.get("fixedge", False )
 
         self.background_size = kwargs.get("background_size", 256 )
         self.background_blur = kwargs.get("background_blur", 1.5 )
@@ -69,6 +71,7 @@ class ProcessEnvironment(object):
         output = open( filename, "w" )
         config = {
 
+            "backgroundBlur": self.background_blur,
             "backgroundCubemapSize": self.background_size,
             "specularCubemapSize": self.specular_size,
             "specularPanoramaSize": self.specular_size * 4,
@@ -78,6 +81,12 @@ class ProcessEnvironment(object):
         }
         json.dump(config, output)
 
+    def compress(self):
+        files = glob.glob( os.path.join(self.output_directory, '*.bin') )
+        for f in files:
+            cmd = "{} a -tgzip -mx=9 -mpass=7 {}.gz {}".format(compress_7Zip_cmd, f, f)
+            output = execute_command(cmd, verbose=False)
+            os.remove( f )
 
     def encode_texture(self, input_file, output_directory=None):
 
@@ -147,15 +156,8 @@ class ProcessEnvironment(object):
             cmd = "{} {} {}".format(cubemap_packer_cmd, pattern, output)
         execute_command(cmd)
 
-        cmd = "gzip -f {}".format( output + "*.bin")
-        execute_command(cmd)
-
-
     def panorama_packer(self, pattern, max_level, output ):
         cmd = "{} {} {} {}".format(panorama_packer_cmd, pattern, max_level, output)
-        execute_command(cmd)
-
-        cmd = "gzip -f {}".format( output + "*.bin")
         execute_command(cmd)
 
     def cubemap_specular_create_mipmap(self, input):
@@ -201,15 +203,13 @@ class ProcessEnvironment(object):
         cmd = "{} -s {} -n {} {}".format(envIntegrateBRDF_cmd, self.integrate_BRDF_size, self.nb_samples, outout_filename)
         execute_command(cmd)
 
-        cmd = "gzip -f {}".format( outout_filename )
-        execute_command(cmd)
-
 
     def background_create( self ):
 
         # compute it one time for panorama
         outout_filename = "/tmp/background.tiff"
-        cmd = "{} -s {} -n {} -r {} -f {} {}".format(envBackground_cmd, self.background_size, self.nb_samples, self.background_blur , self.cubemap_generic, outout_filename)
+        fixedge = '-f' if self.fixedge else ''
+        cmd = "{} -s {} -n {} -r {} {} {} {}".format(envBackground_cmd, self.background_size, self.nb_samples, self.background_blur , fixedge, self.cubemap_generic, outout_filename)
         execute_command(cmd)
 
         # packer use a pattern, fix cubemap packer ?
@@ -295,36 +295,33 @@ class ProcessEnvironment(object):
         self.writeConfig( os.path.join(self.output_directory, "config.json" ) )
 
 
+        self.compress()
+
         print ("processed in {} seconds".format(time.time() - start))
 
 
-argv = sys.argv
-input_file = argv[1]
-output_directory = argv[2]
-#pattern_filter = argv[3]
+parser = argparse.ArgumentParser()
+parser.add_argument("file", help="hdr environment [ .hdr .tif .exr ]")
+parser.add_argument("output", help="output directory")
+parser.add_argument("--nbSamples", action='store', dest='nb_samples', help="nb samples to compute environment 16 to 65536", default=4096)
+parser.add_argument("--specularSize", action='store', dest='specular_size', help="cubemap size for prefiltered texture", default=256)
+parser.add_argument("--backgroundSize", action='store', dest='background_size', help="cubemap size for background texture", default=256)
+parser.add_argument("--backgroundBlur", action='store', dest='background_blur', help="how to blur the background, it uses the same code of prefiltering", default=1.5)
+parser.add_argument("--fixedge", action='store_true', help="fix edge for cubemap")
 
-#process = ProcessEnvironment(input_file, output_directory, specular_size = 256, nb_samples = 65536)
-#process = ProcessEnvironment(input_file, output_directory, specular_size = 256, nb_samples = 1024)
-#process = ProcessEnvironment( input_file, output_directory, specular_size = 512, nb_samples = 65536, prefilter_stop_size = 8 )
-process = ProcessEnvironment( input_file, output_directory, specular_size = 256, nb_samples = 65536, prefilter_stop_size = 8 )
-#process = ProcessEnvironment(input_file, output_directory, nb_samples = 1024)
+
+
+args = parser.parse_args()
+input_file = args.file
+output_directory = args.output
+
+print(args)
+process = ProcessEnvironment( input_file,
+                              output_directory,
+                              background_size = args.background_size,
+                              specular_size = args.specular_size,
+                              nb_samples = args.nb_samples,
+                              background_blur = args.background_blur,
+                              prefilter_stop_size = 8,
+                              fixedge = args.fixedge )
 process.run()
-
-
-# create a cubemap for original to max size we will use
-
-
-# compute irradiance
-# compute irrandiance from cubemap
-# extract spherical harmonics
-
-# convert cubemap irradiance to panorama
-
-# encode panorama irradiance to png rgbe
-# encode cubemap irradiance to png rgbe
-
-
-# specular
-# for all mipmap level
-# resize and fixEdge
-# pack and encode
