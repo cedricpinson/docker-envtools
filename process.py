@@ -80,12 +80,12 @@ class ProcessEnvironment(object):
             "backgroundBlur": self.background_blur,
             "backgroundCubemapSize": [ self.background_size, self.background_size ],
 
-            "specularCubemapSize": [ self.specular_size, self.specular_size ],
-            "specularPanoramaSize": [ self.specular_size * 4, self.specular_size * 4 ],
+            "specularCubemapUE4Size": [ self.specular_size, self.specular_size ],
+            "specularPanoramaUE4Size": [ self.specular_size * 4, self.specular_size * 4 ],
             "specularLimitSize": self.prefilter_stop_size,
 
             "brdfUE4": self.brdf_file + '.gz',
-            "brdfSize": [ self.integrate_BRDF_size, self.integrate_BRDF_size ],
+            "brdfUE4Size": [ self.integrate_BRDF_size, self.integrate_BRDF_size ],
 
             "diffuseSPH": json.loads(self.sh_coef)
         }
