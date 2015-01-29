@@ -54,7 +54,6 @@ class ProcessEnvironment(object):
     def __init__(self, input_file, output_directory, **kwargs):
         self.input_file = os.path.abspath(input_file)
         self.output_directory = output_directory
-        self.specular_size = kwargs.get("specular_size", 512 )
         self.integrate_BRDF_size = kwargs.get("brdf_texture_size", 128 )
         self.irradiance_size = kwargs.get("irradiance_size", 32 )
         self.pattern_filter = kwargs.get("pattern_filter", "rgss" )
@@ -62,9 +61,16 @@ class ProcessEnvironment(object):
         self.prefilter_stop_size = kwargs.get("prefilter_stop_size", 8 )
         self.fixedge = kwargs.get("fixedge", False )
 
+        self.specular_size = kwargs.get("specular_size", 512 )
+        self.specular_file_base = "specular"
+
+        self.brdf_file = 'brdf_ue4.bin'
+
         self.background_size = kwargs.get("background_size", 256 )
         self.background_blur = kwargs.get("background_blur", 1.5 )
+        self.background_file_base = 'background_cubemap'
 
+        self.encoding_list = [ "rgbm", "luv", "float" ]
 
 
     def writeConfig(self, filename):
@@ -72,14 +78,29 @@ class ProcessEnvironment(object):
         config = {
 
             "backgroundBlur": self.background_blur,
-            "backgroundCubemapSize": self.background_size,
-            "specularCubemapSize": self.specular_size,
-            "specularPanoramaSize": self.specular_size * 4,
+            "backgroundCubemapSize": [ self.background_size, self.background_size ],
+
+            "specularCubemapSize": [ self.specular_size, self.specular_size ],
+            "specularPanoramaSize": [ self.specular_size * 4, self.specular_size * 4 ],
             "specularLimitSize": self.prefilter_stop_size,
 
-            "shCoefs": json.loads(self.sh_coef)
+            "brdfUE4": self.brdf_file + '.gz',
+            "brdfSize": [ self.integrate_BRDF_size, self.integrate_BRDF_size ],
+
+            "diffuseSPH": json.loads(self.sh_coef)
         }
-        json.dump(config, output)
+
+        for enc in self.encoding_list:
+            file = "{}_{}.bin.gz".format( self.background_file_base, enc)
+            key = "backgroundCubemap_{}".format( enc )
+            config[key] = file
+
+            for env_type in [ "Panorama", "Cubemap" ]:
+                file = "{}_{}_ue4_{}.bin.gz".format( self.specular_file_base, env_type.lower(), enc)
+                key = "specular{}UE4_{}".format( env_type, enc )
+                config[key] = file
+
+        json.dump(config, output) #, sort_keys=True, indent=4)
 
     def compress(self):
         files = glob.glob( os.path.join(self.output_directory, '*.bin') )
@@ -214,7 +235,7 @@ class ProcessEnvironment(object):
 
         # packer use a pattern, fix cubemap packer ?
         input_filename = outout_filename
-        output = os.path.join(self.output_directory, "background_cubemap" )
+        output = os.path.join(self.output_directory, self.background_file_base )
         self.cubemap_packer( input_filename, 0, output )
 
 
