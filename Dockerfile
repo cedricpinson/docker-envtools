@@ -20,8 +20,6 @@ RUN apt-get -y update --fix-missing && apt-get install -y \
     python \
     wget
 
-ADD process.py /usr/local/bin/
-
 RUN echo "/usr/local/lib64/" >/etc/ld.so.conf.d/lib64.conf
 RUN echo "/usr/local/lib/" >/etc/ld.so.conf.d/lib.conf
 
